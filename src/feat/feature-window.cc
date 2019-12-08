@@ -115,6 +115,8 @@ FeatureWindowFunction::FeatureWindowFunction(const FrameExtractionOptions &opts)
     double i_fl = static_cast<double>(i);
     if (opts.window_type == "hanning") {
       window(i) = 0.5  - 0.5*cos(a * i_fl);
+    } else if (opts.window_type == "squared-root-hann") {
+      window(i) = sqrt(0.5  - 0.5*cos(a * i_fl));
     } else if (opts.window_type == "sine") {
       // when you are checking ws wikipedia, please
       // note that 0.5 * a = M_PI/(frame_length-1)

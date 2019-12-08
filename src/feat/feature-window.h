@@ -80,8 +80,8 @@ struct FrameExtractionOptions {
                    "If you turn this off, you should set the --energy-floor "
                    "option, e.g. to 1.0 or 0.1");
     opts->Register("window-type", &window_type, "Type of window "
-                   "(\"hamming\"|\"hanning\"|\"povey\"|\"rectangular\""
-                   "|\"sine\"|\"blackmann\")");
+                   "(\"hamming\"|\"hanning\"|\"squared-root-hann\"|\"povey\"|\"rectangular\""
+                   "|\"sine\"|\"blackman\")");
     opts->Register("blackman-coeff", &blackman_coeff,
                    "Constant coefficient for generalized Blackman window.");
     opts->Register("round-to-power-of-two", &round_to_power_of_two,
