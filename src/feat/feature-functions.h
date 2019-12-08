@@ -44,6 +44,8 @@ namespace kaldi {
 // remaining (n/2) - 1 elements are undefined at output.
 void ComputePowerSpectrum(VectorBase<BaseFloat> *complex_fft);
 
+// Reorder the complex FFT into [re(0), re(n/2), re(1), ..., im(1)...].
+void ReorderReIm(VectorBase<BaseFloat> *complex_fft);
 
 struct DeltaFeaturesOptions {
   int32 order;

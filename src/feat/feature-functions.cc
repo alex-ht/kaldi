@@ -50,6 +50,16 @@ void ComputePowerSpectrum(VectorBase<BaseFloat> *waveform) {
   // if the signal has been bandlimited sensibly this should be zero.
 }
 
+void ReorderReIm(VectorBase<BaseFloat> *complex_fft) {
+  int32 dim = waveform->Dim();
+  int32 half_dim = dim/2;
+  for (int32 i = 1; i < (half_dim - 1); i++) {
+    // swap im and next real
+    int next_real_pos = (i+1)*2;
+    int im_pos = i*2 + 1;
+    swap((*complex_fft)(next_real_pos), (*complex_fft)(im_pos));
+  }
+}
 
 DeltaFeatures::DeltaFeatures(const DeltaFeaturesOptions &opts): opts_(opts) {
   KALDI_ASSERT(opts.order >= 0 && opts.order < 1000);  // just make sure we don't get binary junk.
