@@ -42,11 +42,13 @@ struct SpectrogramOptions {
   bool return_raw_fft; // If true, return the raw FFT spectrum
                        // Note that in that case the Dim() will return double
                        // the expected dimension (because of the complex domain of it)
+  bool reorder;  // Reorder if return raw fft
 
   SpectrogramOptions() :
     energy_floor(0.0),
     raw_energy(true),
-    return_raw_fft(false) {}
+    return_raw_fft(false),
+    reorder(false) {}
 
   void Register(OptionsItf *opts) {
     frame_opts.Register(opts);
@@ -60,6 +62,9 @@ struct SpectrogramOptions {
                    "If true, compute energy before preemphasis and windowing");
     opts->Register("return-raw-fft", &return_raw_fft,
                    "If true, return raw FFT complex numbers instead of log magnitudes");
+    opts->Register("reorder", &reorder,
+                    "If true and return-raw-fft, reorder cFFT into [real part,"
+                    "image part].");
   }
 };
 
