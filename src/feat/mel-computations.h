@@ -79,11 +79,11 @@ class MelBanks {
  public:
 
   static inline BaseFloat InverseMelScale(BaseFloat mel_freq) {
-    return 700.0f * (expf (mel_freq / 1127.0f) - 1.0f);
+    return 1000.0f * expm1(mel_freq * 0.00069314718f);
   }
 
   static inline BaseFloat MelScale(BaseFloat freq) {
-    return 1127.0f * logf (1.0f + freq / 700.0f);
+    return 1442.695041f * log1p(freq / 1000.0f);
   }
 
   static BaseFloat VtlnWarpFreq(BaseFloat vtln_low_cutoff,
