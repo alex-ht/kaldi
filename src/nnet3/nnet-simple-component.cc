@@ -1097,6 +1097,125 @@ void RectifiedLinearComponent::StoreStats(
   StoreStatsInternal(out_value, &temp_deriv);
 }
 
+void* SoftplusComponent::Propagate(
+    const ComponentPrecomputedIndexes *indexes,
+    const CuMatrixBase<BaseFloat> &in,
+    CuMatrixBase<BaseFloat> *out) const {
+  CuMatrix<BaseFloat> tmp(in);
+  tmp.ApplyExp();
+  tmp.Add(1.0f);
+  tmp.ApplyLog();
+  out->Tanh(tmp);
+  out->MulElements(in);
+  return NULL;
+}
+
+void SoftplusComponent::Backprop(
+    const std::string &debug_info,
+    const ComponentPrecomputedIndexes *indexes,
+    const CuMatrixBase<BaseFloat> &in_value,
+    const CuMatrixBase<BaseFloat> &out_value,
+    const CuMatrixBase<BaseFloat> &out_deriv,
+    void *memo,
+    Component *to_update_in,
+    CuMatrixBase<BaseFloat> *in_deriv) const {
+  NVTX_RANGE("SoftplusComponent::Backprop");
+  if (in_deriv != NULL) {
+    in_deriv.Sigmoid(in_value);
+    in_deriv->MulElements(out_deriv);
+    SoftplusComponent *to_update =
+        dynamic_cast<SoftplusComponent*>(to_update_in);
+    if (to_update != NULL) {
+      RepairGradients(in_deriv, to_update);
+      to_update->StoreBackpropStats(out_deriv);
+    }
+  }
+}
+
+/*
+  Note on the derivative of the softplus function:
+  softplus'(x) = sigmoid(x)
+*/
+void SoftplusComponent::StoreStats(const CuMatrixBase<BaseFloat> &in_value,
+                               const CuMatrixBase<BaseFloat> &out_value,
+                               void *memo) {
+  // Only store stats about every other minibatch (but on the first minibatch,
+  // always store it, which is necessary for the ConsolidateMemory() operation
+  // to work correctly.
+  if (RandInt(0, 1) == 0 && count_ != 0)
+    return;
+  // derivative of the onlinearity is out_value * (1.0 - out_value);
+  CuMatrix<BaseFloat> temp_deriv(in_value.RumRows(),
+                                 in_value.NumCols(),
+                                 kUndefined);
+  temp_deriv.Sigmoid(in_value);
+  StoreStatsInternal(out_value, &temp_deriv);
+}
+
+void SoftplusComponent::RepairGradients(CuMatrixBase<BaseFloat> *in_deriv,
+                     SoftplusComponentComponent *to_update) const;
+  KALDI_ASSERT(to_update != NULL);
+  // maximum possible derivative of SoftplusComponentComponent is 1.0
+  // the default lower-threshold on the derivative, below which we
+  // add a term to the derivative to encourage the inputs to the sigmoid
+  // to be closer to zero, is 0.2, which means the derivative is on average
+  // 5 times smaller than its maximum possible value.
+  BaseFloat default_lower_threshold = 0.2;
+
+  // we use this 'repair_probability' (hardcoded for now) to limit
+  // this code to running on about half of the minibatches.
+  BaseFloat repair_probability = 0.5;
+
+  to_update->num_dims_processed_ += dim_;
+
+  if (self_repair_scale_ == 0.0 || count_ == 0.0 || deriv_sum_.Dim() != dim_ ||
+      RandUniform() > repair_probability)
+    return;
+
+  // check that the self-repair scale is in a reasonable range.
+  KALDI_ASSERT(self_repair_scale_ > 0.0 && self_repair_scale_ < 0.1);
+  BaseFloat unset = kUnsetThreshold; // -1000.0
+  BaseFloat lower_threshold = (self_repair_lower_threshold_ == unset ?
+                               default_lower_threshold :
+                               self_repair_lower_threshold_) *
+      count_;
+  if (self_repair_upper_threshold_ != unset) {
+    KALDI_ERR << "Do not set the self-repair-upper-threshold for sigmoid "
+              << "components, it does nothing.";
+  }
+
+  // thresholds_vec is actually a 1-row matrix.  (the ApplyHeaviside
+  // function isn't defined for vectors).
+  CuMatrix<BaseFloat> thresholds(1, dim_);
+  CuSubVector<BaseFloat> thresholds_vec(thresholds, 0);
+  thresholds_vec.AddVec(-1.0, deriv_sum_);
+  thresholds_vec.Add(lower_threshold);
+  thresholds.ApplyHeaviside();
+  to_update->num_dims_self_repaired_ += thresholds_vec.Sum();
+
+  // At this point, 'thresholds_vec' contains a 1 for each dimension of
+  // the output that is 'problematic', i.e. for which the avg-deriv
+  // is less than the self-repair lower threshold, and a 0 for
+  // each dimension that is not problematic.
+
+  // what we want to do is to add -self_repair_scale_ / repair_probability times
+  // output-valiue) to the input derivative for each problematic dimension.
+  // note that for the tanh, the output-value goes from -1.0 when the input is
+  // -inf to +1.0 when the input is +inf.  The negative sign is so that for
+  // inputs <0, we push them up towards 0, and for inputs >0, we push them down
+  // towards 0.  Our use of the tanh here is just a convenience since we have it
+  // available.  We could use just about any function that is positive for
+  // inputs < 0 and negative for inputs > 0.
+
+  // We can rearrange the above as: for only the problematic columns,
+  //   input-deriv -= self-repair-scale / repair-probabilty * output
+  // which we can write as:
+  //   input-deriv -=  self-repair-scale / repair-probabilty * output * thresholds-vec
+
+  in_deriv->AddMatDiagVec(-self_repair_scale_ / repair_probability,
+                          out_value, kNoTrans, thresholds_vec);
+}
+
 void AffineComponent::Scale(BaseFloat scale) {
   if (scale == 0.0) {
     // If scale == 0.0 we call SetZero() which will get rid of NaN's and inf's.

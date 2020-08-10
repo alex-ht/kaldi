@@ -375,6 +375,39 @@ class RectifiedLinearComponent: public NonlinearComponent {
   RectifiedLinearComponent &operator = (const RectifiedLinearComponent &other); // Disallow.
 };
 
+class SoftplusComponent: public NonlinearComponent {
+ public:
+  explicit SoftplusComponent(const SoftplusComponent &other):
+      NonlinearComponent(other) { }
+  SoftplusComponent() { }
+  virtual std::string Type() const { return "SoftplusComponent"; }
+  virtual Component* Copy() const { return new SoftplusComponent(*this); }
+  virtual int32 Properties() const {
+    return kSimpleComponent|kBackpropNeedsOutput|kPropagateInPlace|
+        kStoresStats|(block_dim_ != dim_ ? kInputContiguous : 0);
+  }
+  virtual void* Propagate(const ComponentPrecomputedIndexes *indexes,
+                         const CuMatrixBase<BaseFloat> &in,
+                         CuMatrixBase<BaseFloat> *out) const;
+  virtual void Backprop(const std::string &debug_info,
+                        const ComponentPrecomputedIndexes *indexes,
+                        const CuMatrixBase<BaseFloat> &, //in_value
+                        const CuMatrixBase<BaseFloat> &out_value,
+                        const CuMatrixBase<BaseFloat> &out_deriv,
+                        void *memo,
+                        Component *to_update,
+                        CuMatrixBase<BaseFloat> *in_deriv) const;
+  virtual void StoreStats(const CuMatrixBase<BaseFloat> &in_value,
+                          const CuMatrixBase<BaseFloat> &out_value,
+                          void *memo);
+ private:
+  // this function is called from Backprop code and only does something if the
+  // self-repair-scale config value is set.
+  void RepairGradients(CuMatrixBase<BaseFloat> *in_deriv,
+                       SoftplusComponent *to_update) const;
+
+  SoftplusComponent &operator = (const SoftplusComponent &other); // Disallow.
+};
 
 class FixedAffineComponent;
 class FixedScaleComponent;
