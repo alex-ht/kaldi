@@ -125,7 +125,7 @@ class XconfigMishTdnnfLayer(XconfigLayerBase):
         configs.append('component name={0}.softplus type=SoftplusComponent dim={1} '
                        'self-repair-scale={2}'.format(
                            name, output_dim, self_repair_scale))
-        configs.append('component-node name={0}.relu component={0}.softplus '
+        configs.append('component-node name={0}.softplus component={0}.softplus '
                        'input={0}.affine'.format(name))
         configs.append('component name={0}.tanh type=TanhComponent dim={1} '
                        'self-repair-scale={2}'.format(
@@ -133,7 +133,7 @@ class XconfigMishTdnnfLayer(XconfigLayerBase):
         configs.append('component-node name={0}.tanh component={0}.tanh '
                        'input={0}.softplus'.format(name))
         configs.append('component name={0}.ep type=ElementwiseProductComponent '
-                       'dim={1} '.format(name, output_dim))
+                       'input-dim={1} output-dim={2} '.format(name, output_dim*2, output_dim))
         configs.append('component-node name={0}.ep component={0}.ep '
                        'input=Append({0}.affine, {0}.tanh)'.format(name))
 
@@ -141,7 +141,7 @@ class XconfigMishTdnnfLayer(XconfigLayerBase):
         configs.append('component name={0}.batchnorm type=BatchNormComponent '
                        'dim={1}'.format(name, output_dim))
         configs.append('component-node name={0}.batchnorm component={0}.batchnorm '
-                       'input={0}.relu'.format(name))
+                       'input={0}.ep'.format(name))
 
         if dropout_proportion != -1:
             # This is not normal dropout.  It's dropout where the mask is shared

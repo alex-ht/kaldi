@@ -76,7 +76,7 @@ config_to_layer = {
         'fast-opgru-layer' : xlayers.XconfigFastOpgruLayer,
         'fast-norm-opgru-layer' : xlayers.XconfigFastNormOpgruLayer,
         'tdnnf-layer': xlayers.XconfigTdnnfLayer,
-        'mish-tdnnf-layer': x.ayers.XconfigMishTdnnfLayer,
+        'mish-tdnnf-layer': xlayers.XconfigMishTdnnfLayer,
         'prefinal-layer': xlayers.XconfigPrefinalLayer,
         'spec-augment-layer': xlayers.XconfigSpecAugmentLayer,
         'renorm-component': xlayers.XconfigRenormComponent,
