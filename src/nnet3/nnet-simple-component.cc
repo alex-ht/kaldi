@@ -1101,12 +1101,10 @@ void* SoftplusComponent::Propagate(
     const ComponentPrecomputedIndexes *indexes,
     const CuMatrixBase<BaseFloat> &in,
     CuMatrixBase<BaseFloat> *out) const {
-  CuMatrix<BaseFloat> tmp(in);
-  tmp.ApplyExp();
-  tmp.Add(1.0f);
-  tmp.ApplyLog();
-  out->Tanh(tmp);
-  out->MulElements(in);
+  out->CopyFromMat(in);
+  out->ApplyExp();
+  out->Add(1.0f);
+  out->ApplyLog();
   return NULL;
 }
 
