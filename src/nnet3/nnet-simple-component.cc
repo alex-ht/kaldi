@@ -1121,12 +1121,12 @@ void SoftplusComponent::Backprop(
     CuMatrixBase<BaseFloat> *in_deriv) const {
   NVTX_RANGE("SoftplusComponent::Backprop");
   if (in_deriv != NULL) {
-    in_deriv.Sigmoid(in_value);
+    in_deriv->Sigmoid(in_value);
     in_deriv->MulElements(out_deriv);
     SoftplusComponent *to_update =
         dynamic_cast<SoftplusComponent*>(to_update_in);
     if (to_update != NULL) {
-      RepairGradients(in_deriv, to_update);
+      RepairGradients(out_value, in_deriv, to_update);
       to_update->StoreBackpropStats(out_deriv);
     }
   }
@@ -1145,17 +1145,19 @@ void SoftplusComponent::StoreStats(const CuMatrixBase<BaseFloat> &in_value,
   if (RandInt(0, 1) == 0 && count_ != 0)
     return;
   // derivative of the onlinearity is out_value * (1.0 - out_value);
-  CuMatrix<BaseFloat> temp_deriv(in_value.RumRows(),
+  CuMatrix<BaseFloat> temp_deriv(in_value.NumRows(),
                                  in_value.NumCols(),
                                  kUndefined);
   temp_deriv.Sigmoid(in_value);
   StoreStatsInternal(out_value, &temp_deriv);
 }
 
-void SoftplusComponent::RepairGradients(CuMatrixBase<BaseFloat> *in_deriv,
-                     SoftplusComponentComponent *to_update) const;
+void SoftplusComponent::RepairGradients(
+                     const CuMatrixBase<BaseFloat> &out_value,
+                     CuMatrixBase<BaseFloat> *in_deriv,
+                     SoftplusComponent *to_update) const {
   KALDI_ASSERT(to_update != NULL);
-  // maximum possible derivative of SoftplusComponentComponent is 1.0
+  // maximum possible derivative of SoftplusComponent is 1.0
   // the default lower-threshold on the derivative, below which we
   // add a term to the derivative to encourage the inputs to the sigmoid
   // to be closer to zero, is 0.2, which means the derivative is on average
