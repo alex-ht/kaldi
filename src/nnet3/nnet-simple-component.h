@@ -403,8 +403,7 @@ class SoftplusComponent: public NonlinearComponent {
  private:
   // this function is called from Backprop code and only does something if the
   // self-repair-scale config value is set.
-  void RepairGradients(const CuMatrixBase<BaseFloat> &out_value,
-                       CuMatrixBase<BaseFloat> *in_deriv,
+  void RepairGradients(CuMatrixBase<BaseFloat> *in_deriv,
                        SoftplusComponent *to_update) const;
 
   SoftplusComponent &operator = (const SoftplusComponent &other); // Disallow.

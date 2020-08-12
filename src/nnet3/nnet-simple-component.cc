@@ -1124,7 +1124,7 @@ void SoftplusComponent::Backprop(
     SoftplusComponent *to_update =
         dynamic_cast<SoftplusComponent*>(to_update_in);
     if (to_update != NULL) {
-      RepairGradients(out_value, in_deriv, to_update);
+      RepairGradients(in_deriv, to_update);
       to_update->StoreBackpropStats(out_deriv);
     }
   }
@@ -1151,69 +1151,89 @@ void SoftplusComponent::StoreStats(const CuMatrixBase<BaseFloat> &in_value,
 }
 
 void SoftplusComponent::RepairGradients(
-                     const CuMatrixBase<BaseFloat> &out_value,
-                     CuMatrixBase<BaseFloat> *in_deriv,
-                     SoftplusComponent *to_update) const {
+  CuMatrixBase<BaseFloat> *in_deriv,
+  SoftplusComponent *to_update) const {
   KALDI_ASSERT(to_update != NULL);
-  // maximum possible derivative of SoftplusComponent is 1.0
-  // the default lower-threshold on the derivative, below which we
-  // add a term to the derivative to encourage the inputs to the sigmoid
-  // to be closer to zero, is 0.2, which means the derivative is on average
-  // 5 times smaller than its maximum possible value.
-  BaseFloat default_lower_threshold = 0.2;
-
+  int32 dim = dim_, block_dim = block_dim_;
+  BaseFloat default_lower_threshold = 0.05,
+     default_upper_threshold = 0.95;
   // we use this 'repair_probability' (hardcoded for now) to limit
   // this code to running on about half of the minibatches.
   BaseFloat repair_probability = 0.5;
+  KALDI_ASSERT(in_deriv->NumCols() == dim || in_deriv->NumCols() == block_dim);
+  if (self_repair_scale_ == 0.0 || count_ == 0.0 ||
+     deriv_sum_.Dim() != dim)
+   return;
 
-  to_update->num_dims_processed_ += dim_;
+  if (in_deriv->NumCols() != block_dim) {
+   KALDI_ASSERT(in_deriv->NumCols() == in_deriv->Stride());
+   int32 dim_multiple = dim / block_dim;
+   CuSubMatrix<BaseFloat> in_deriv_reshaped(in_deriv->Data(),
+                                            in_deriv->NumRows() * dim_multiple,
+                                            block_dim, block_dim);
+   RepairGradients(&in_deriv_reshaped, to_update);
+   return;
+  }
 
-  if (self_repair_scale_ == 0.0 || count_ == 0.0 || deriv_sum_.Dim() != dim_ ||
-      RandUniform() > repair_probability)
-    return;
+  // By now we know that in_deriv->NumCols() == block_dim.
+
+  if (RandUniform() > repair_probability)
+   return;
+
+  to_update->num_dims_processed_ += block_dim;
 
   // check that the self-repair scale is in a reasonable range.
   KALDI_ASSERT(self_repair_scale_ > 0.0 && self_repair_scale_ < 0.1);
   BaseFloat unset = kUnsetThreshold; // -1000.0
-  BaseFloat lower_threshold = (self_repair_lower_threshold_ == unset ?
-                               default_lower_threshold :
-                               self_repair_lower_threshold_) *
-      count_;
-  if (self_repair_upper_threshold_ != unset) {
-    KALDI_ERR << "Do not set the self-repair-upper-threshold for sigmoid "
-              << "components, it does nothing.";
+  BaseFloat count = count_,
+     lower_threshold = (self_repair_lower_threshold_ == unset ?
+                        default_lower_threshold :
+                        self_repair_lower_threshold_) * count,
+     upper_threshold = (self_repair_upper_threshold_ == unset ?
+                        default_upper_threshold :
+                        self_repair_upper_threshold_) * count;
+
+  CuMatrix<BaseFloat> storage(2, block_dim + 2, kUndefined);
+  CuSubVector<BaseFloat> thresholds_vec(storage.RowData(0) + block_dim, 2);
+  CuSubMatrix<BaseFloat> stats_mat(storage, 0, 2, 0, block_dim);
+  thresholds_vec(0) = -lower_threshold;
+  thresholds_vec(1) = -upper_threshold;
+  CuSubVector<BaseFloat> row0(stats_mat, 0);
+  CuSubVector<BaseFloat> row1(stats_mat, 1);
+
+  if (block_dim == dim) {
+   row0.CopyFromVec(deriv_sum_);
+  } else {
+   CuSubMatrix<double> deriv_sum_mat(deriv_sum_.Data(),
+                                     dim / block_dim,
+                                     block_dim, block_dim);
+   CuVector<double> deriv_sum_dbl(block_dim);
+   // get the average of the deriv-sums over the blocks.
+   deriv_sum_dbl.AddRowSumMat(block_dim * 1.0 / dim, deriv_sum_mat);
+   row0.CopyFromVec(deriv_sum_dbl);
   }
-
-  // thresholds_vec is actually a 1-row matrix.  (the ApplyHeaviside
-  // function isn't defined for vectors).
-  CuMatrix<BaseFloat> thresholds(1, dim_);
-  CuSubVector<BaseFloat> thresholds_vec(thresholds, 0);
-  thresholds_vec.AddVec(-1.0, deriv_sum_);
-  thresholds_vec.Add(lower_threshold);
-  thresholds.ApplyHeaviside();
-  to_update->num_dims_self_repaired_ += thresholds_vec.Sum();
-
-  // At this point, 'thresholds_vec' contains a 1 for each dimension of
-  // the output that is 'problematic', i.e. for which the avg-deriv
-  // is less than the self-repair lower threshold, and a 0 for
-  // each dimension that is not problematic.
-
-  // what we want to do is to add -self_repair_scale_ / repair_probability times
-  // output-valiue) to the input derivative for each problematic dimension.
-  // note that for the tanh, the output-value goes from -1.0 when the input is
-  // -inf to +1.0 when the input is +inf.  The negative sign is so that for
-  // inputs <0, we push them up towards 0, and for inputs >0, we push them down
-  // towards 0.  Our use of the tanh here is just a convenience since we have it
-  // available.  We could use just about any function that is positive for
-  // inputs < 0 and negative for inputs > 0.
-
-  // We can rearrange the above as: for only the problematic columns,
-  //   input-deriv -= self-repair-scale / repair-probabilty * output
-  // which we can write as:
-  //   input-deriv -=  self-repair-scale / repair-probabilty * output * thresholds-vec
-
-  in_deriv->AddMatDiagVec(-self_repair_scale_ / repair_probability,
-                          out_value, kNoTrans, thresholds_vec);
+  row1.CopyFromVec(row0);
+  stats_mat.AddVecToCols(1.0, thresholds_vec, 1.0);
+  // now row0 equals stats - lower_threshold, and
+  //     row1 equals stats - upper_threshold.
+  stats_mat.ApplyHeaviside();
+  // now row0 equals (stats > lower_threshold ? 1 : 0), and
+  //     row1 equals (stats > upper_threshold ? 1 : 0).
+  // what we want is:
+  // self_repair_scale * ((stats <= lower_threshold ? 1 : 0) +
+  //                         (stats > upper_threshold ? -1 : 0)).
+  //
+  // we can get these in stats_mat.Row(0) by computing:
+  // -self_repair_scale * (stats_mat.Row(1)  + stats_mat.Row(0) - 1).
+  row0.AddVec(1.0, row1, 1.0);
+  row0.Add(-1.0);
+  CuVector<BaseFloat> temp(row0);
+  temp.ApplyPow(2.0);
+  to_update->num_dims_self_repaired_ += temp.Sum();
+  // [actually we need to divide by repair_probability also, to
+  //  correct for the fact that we only do this on some frames.]
+  row0.Scale(-self_repair_scale_ / repair_probability);
+  in_deriv->AddVecToRows(1.0, row0, 1.0);
 }
 
 void AffineComponent::Scale(BaseFloat scale) {
