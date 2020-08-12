@@ -383,7 +383,7 @@ class SoftplusComponent: public NonlinearComponent {
   virtual std::string Type() const { return "SoftplusComponent"; }
   virtual Component* Copy() const { return new SoftplusComponent(*this); }
   virtual int32 Properties() const {
-    return kSimpleComponent|kBackpropNeedsOutput|kPropagateInPlace|
+    return kSimpleComponent|kBackpropNeedsInput|kBackpropNeedsOutput|kPropagateInPlace|
         kStoresStats|(block_dim_ != dim_ ? kInputContiguous : 0);
   }
   virtual void* Propagate(const ComponentPrecomputedIndexes *indexes,
@@ -391,7 +391,7 @@ class SoftplusComponent: public NonlinearComponent {
                          CuMatrixBase<BaseFloat> *out) const;
   virtual void Backprop(const std::string &debug_info,
                         const ComponentPrecomputedIndexes *indexes,
-                        const CuMatrixBase<BaseFloat> &, //in_value
+                        const CuMatrixBase<BaseFloat> &in_value,
                         const CuMatrixBase<BaseFloat> &out_value,
                         const CuMatrixBase<BaseFloat> &out_deriv,
                         void *memo,
