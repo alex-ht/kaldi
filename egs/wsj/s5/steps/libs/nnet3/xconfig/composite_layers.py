@@ -311,7 +311,7 @@ class XconfigPrefinalLayer(XconfigLayerBase):
             configs.append('component name={0}.nonlinear type=MishComponent dim={1} '
                            'self-repair-scale={2}'.format(
                                name, big_dim, self_repair_scale))
-            configs.append('component-node name={0}.nonlinear component={0}.relu '
+            configs.append('component-node name={0}.nonlinear component={0}.mish '
                            'input={0}.affine'.format(name))
 
         # The first BatchNorm layer
