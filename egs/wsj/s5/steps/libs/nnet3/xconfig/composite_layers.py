@@ -305,13 +305,13 @@ class XconfigPrefinalLayer(XconfigLayerBase):
             configs.append('component name={0}.nonlinear type=RectifiedLinearComponent dim={1} '
                            'self-repair-scale={2}'.format(
                                name, big_dim, self_repair_scale))
-            configs.append('component-node name={0}.nonlinear component={0}.relu '
+            configs.append('component-node name={0}.nonlinear component={0}.nonlinear '
                            'input={0}.affine'.format(name))
         elif self.config['nonlinear'] == 'mish':
             configs.append('component name={0}.nonlinear type=MishComponent dim={1} '
                            'self-repair-scale={2}'.format(
                                name, big_dim, self_repair_scale))
-            configs.append('component-node name={0}.nonlinear component={0}.mish '
+            configs.append('component-node name={0}.nonlinear component={0}.nonlinear '
                            'input={0}.affine'.format(name))
 
         # The first BatchNorm layer
