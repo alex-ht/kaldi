@@ -17,13 +17,8 @@
 // See the Apache 2 License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm>
-#include <iomanip>
-#include <iterator>
-#include <sstream>
-
-#include "cudamatrix/cu-math.h"
 #include "nnet3/mish-component.h"
+#include "cudamatrix/cu-math.h"
 
 namespace kaldi {
 namespace nnet3 {
@@ -39,52 +34,20 @@ void *MishComponent::Propagate(const ComponentPrecomputedIndexes *indexes,
 }
 
 void DiffMish(const CuMatrixBase<BaseFloat> &in_value,
-              CuMatrixBase<BaseFloat> *deriv) {
-  // omega = np.exp(3*x) + 4*np.exp(2*x) + (4*x)*np.exp(x)
-  //          + 6*np.exp(x) + 4*(1 + x)
-  // delta = pow(1 + pow((np.exp(x) + 1), 2), 2)
-  // derivative = np.exp(x) * omega / delta
-  CuMatrix<BaseFloat> tmp(6 * in_value.NumRows(), in_value.NumCols(),
+              CuMatrixBase<BaseFloat> *in_deriv) {
+  CuMatrix<BaseFloat> tmp(3 * in_value.NumRows(), in_value.NumCols(),
                           kUndefined);
-  CuSubMatrix<BaseFloat> item1 = tmp.RowRange(0, in_value.NumRows());
-  CuSubMatrix<BaseFloat> item2 = tmp.RowRange(in_value.NumRows(), in_value.NumRows());
-  CuSubMatrix<BaseFloat> item3 = tmp.RowRange(2 * in_value.NumRows(), in_value.NumRows());
-  CuSubMatrix<BaseFloat> item4 = tmp.RowRange(3 * in_value.NumRows(), in_value.NumRows());
-  CuSubMatrix<BaseFloat> item5 = tmp.RowRange(4 * in_value.NumRows(), in_value.NumRows());
-  CuSubMatrix<BaseFloat> expx = tmp.RowRange(5 * in_value.NumRows(), in_value.NumRows());
-
-  item1.CopyFromMat(in_value);
-  item2.CopyFromMat(in_value);
-  item3.CopyFromMat(in_value);
-  item4.CopyFromMat(in_value);
-  item5.CopyFromMat(in_value);
-  expx.CopyFromMat(in_value);
-
-  item1.Scale(3.0);
-  item2.Scale(2.0);
-  tmp.ApplyExp();
-  item2.Scale(4.0);
-  item4.Scale(6.0);
-  item5.Scale(4.0);  // 4x
-  item3.MulElements(item5);
-  item5.Add(4.0);
-
-  // item1 -> omega
-  item1.AddMat(1.0, item2);
-  item1.AddMat(1.0, item3);
-  item1.AddMat(1.0, item4);
-  item1.AddMat(1.0, item5);
-
-  // item2 -> delta
-  item2.CopyFromMat(expx);
-  item2.Add(1.0);
-  item2.ApplyPow(2.0);
-  item2.Add(1.0);
-  item2.ApplyPow(2.0);
-
-  deriv->CopyFromMat(expx);
-  deriv->MulElements(item1);
-  deriv->DivElements(item2);
+  CuSubMatrix<BaseFloat> x_sigmoid = tmp.RowRange(0, in_value.NumRows());
+  CuSubMatrix<BaseFloat> x_sp =
+      tmp.RowRange(in_value.NumRows(), in_value.NumRows());
+  CuSubMatrix<BaseFloat> x_tanh_sp =
+      tmp.RowRange(2 * in_value.NumRows(), in_value.NumRows());
+  x_sigmoid.Sigmoid(in_value);
+  x_sp.SoftHinge(in_value);
+  x_tanh_sp.Tanh(x_sp);
+  in_deriv->DiffTanh(x_tanh_sp, x_sigmoid);
+  in_deriv->MulElements(in_value);
+  in_deriv->AddMat(1.0, x_tanh_sp);
 }
 
 void MishComponent::Backprop(const std::string &debug_info,
