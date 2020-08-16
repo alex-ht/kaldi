@@ -23,8 +23,7 @@
 #include <sstream>
 
 #include "cudamatrix/cu-math.h"
-#include "nnet3/nnet-parse.h"
-#include "nnet3/nnet-simple-component.h"
+#include "nnet3/mish-component.h"
 
 namespace kaldi {
 namespace nnet3 {
@@ -47,12 +46,12 @@ void DiffMish(const CuMatrixBase<BaseFloat> &in_value,
   // derivative = np.exp(x) * omega / delta
   CuMatrix<BaseFloat> tmp(6 * in_value.NumRows(), in_value.NumCols(),
                           kUndefined);
-  CuSubMatrix item1 = tmp.RowRange(0, in_value.NumRows());
-  CuSubMatrix item2 = tmp.RowRange(in_value.NumRows(), in_value.NumRows());
-  CuSubMatrix item3 = tmp.RowRange(2 * in_value.NumRows(), in_value.NumRows());
-  CuSubMatrix item4 = tmp.RowRange(3 * in_value.NumRows(), in_value.NumRows());
-  CuSubMatrix item5 = tmp.RowRange(4 * in_value.NumRows(), in_value.NumRows());
-  CuSubMatrix expx = tmp.RowRange(5 * in_value.NumRows(), in_value.NumRows());
+  CuSubMatrix<BaseFloat> item1 = tmp.RowRange(0, in_value.NumRows());
+  CuSubMatrix<BaseFloat> item2 = tmp.RowRange(in_value.NumRows(), in_value.NumRows());
+  CuSubMatrix<BaseFloat> item3 = tmp.RowRange(2 * in_value.NumRows(), in_value.NumRows());
+  CuSubMatrix<BaseFloat> item4 = tmp.RowRange(3 * in_value.NumRows(), in_value.NumRows());
+  CuSubMatrix<BaseFloat> item5 = tmp.RowRange(4 * in_value.NumRows(), in_value.NumRows());
+  CuSubMatrix<BaseFloat> expx = tmp.RowRange(5 * in_value.NumRows(), in_value.NumRows());
 
   item1.CopyFromMat(in_value);
   item2.CopyFromMat(in_value);
@@ -71,10 +70,10 @@ void DiffMish(const CuMatrixBase<BaseFloat> &in_value,
   item5.Add(4.0);
 
   // item1 -> omega
-  item1.AddMat(item2);
-  item1.AddMat(item3);
-  item1.AddMat(item4);
-  item1.AddMat(item5);
+  item1.AddMat(1.0, item2);
+  item1.AddMat(1.0, item3);
+  item1.AddMat(1.0, item4);
+  item1.AddMat(1.0, item5);
 
   // item2 -> delta
   item2.CopyFromMat(expx);
@@ -85,7 +84,7 @@ void DiffMish(const CuMatrixBase<BaseFloat> &in_value,
 
   deriv->CopyFromMat(expx);
   deriv->MulElements(item1);
-  deriv->DivElements(delta);
+  deriv->DivElements(item2);
 }
 
 void MishComponent::Backprop(const std::string &debug_info,

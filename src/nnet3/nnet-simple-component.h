@@ -409,40 +409,6 @@ class SoftplusComponent: public NonlinearComponent {
   SoftplusComponent &operator = (const SoftplusComponent &other); // Disallow.
 };
 
-class MishComponent: public NonlinearComponent {
- public:
-  explicit MishComponent(const MishComponent &other):
-      NonlinearComponent(other) { }
-  SoftplusComponent() { }
-  virtual std::string Type() const { return "MishComponent"; }
-  virtual Component* Copy() const { return new MishComponent(*this); }
-  virtual int32 Properties() const {
-    return kSimpleComponent|kBackpropNeedsInput|kPropagateInPlace|
-        kStoresStats|(block_dim_ != dim_ ? kInputContiguous : 0);
-  }
-  virtual void* Propagate(const ComponentPrecomputedIndexes *indexes,
-                         const CuMatrixBase<BaseFloat> &in,
-                         CuMatrixBase<BaseFloat> *out) const;
-  virtual void Backprop(const std::string &debug_info,
-                        const ComponentPrecomputedIndexes *indexes,
-                        const CuMatrixBase<BaseFloat> &in_value,
-                        const CuMatrixBase<BaseFloat> &, // out_value
-                        const CuMatrixBase<BaseFloat> &out_deriv,
-                        void *memo,
-                        Component *to_update,
-                        CuMatrixBase<BaseFloat> *in_deriv) const;
-  virtual void StoreStats(const CuMatrixBase<BaseFloat> &in_value,
-                          const CuMatrixBase<BaseFloat> &out_value,
-                          void *memo);
- private:
-  // this function is called from Backprop code and only does something if the
-  // self-repair-scale config value is set.
-  void RepairGradients(CuMatrixBase<BaseFloat> *in_deriv,
-                       MishComponent *to_update) const;
-
-  MishComponent &operator = (const MishComponent &other); // Disallow.
-};
-
 class FixedAffineComponent;
 class FixedScaleComponent;
 class PerElementScaleComponent;
