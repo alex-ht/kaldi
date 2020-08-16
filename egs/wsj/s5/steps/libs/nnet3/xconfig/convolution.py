@@ -116,7 +116,7 @@ class XconfigConvLayer(XconfigLayerBase):
     def __init__(self, first_token, key_to_value, prev_names = None):
         for operation in first_token.split('-')[:-1]:
             assert operation in ['conv', 'renorm', 'batchnorm', 'relu',
-                                 'noconv', 'dropout', 'so']
+                                 'noconv', 'dropout', 'so', 'mish']
         XconfigLayerBase.__init__(self, first_token, key_to_value, prev_names)
 
     def set_default_configs(self):
@@ -222,7 +222,7 @@ class XconfigConvLayer(XconfigLayerBase):
             operations = operations[:-1]
         assert len(operations) >= 1
         last_operation = operations[-1]
-        assert last_operation in ['relu', 'conv', 'renorm', 'batchnorm', 'dropout', 'so']
+        assert last_operation in ['relu', 'conv', 'renorm', 'batchnorm', 'dropout', 'so', 'mish']
         # we'll return something like 'layer1.batchnorm'.
         return '{0}.{1}'.format(self.name, last_operation)
 
@@ -304,6 +304,15 @@ class XconfigConvLayer(XconfigLayerBase):
                                    self.config['self-repair-scale'],
                                    self.config['self-repair-lower-threshold']))
                 configs.append('component-node name={0}.relu component={0}.relu '
+                               'input={1}'.format(name, cur_descriptor))
+            elif operation == 'mish':
+                configs.append('component name={0}.mish type=MishComponent '
+                               'dim={1} block-dim={2} self-repair-scale={3} '
+                               'self-repair-lower-threshold={4}'.format(
+                                   name, cur_num_filters * cur_height, cur_num_filters,
+                                   self.config['self-repair-scale'],
+                                   self.config['self-repair-lower-threshold']))
+                configs.append('component-node name={0}.mish component={0}.mish '
                                'input={1}'.format(name, cur_descriptor))
             elif operation == 'dropout':
                 configs.append('component name={0}.dropout type=DropoutComponent '
