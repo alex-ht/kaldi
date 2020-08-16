@@ -30,6 +30,7 @@
 #include "nnet3/nnet-attention-component.h"
 #include "nnet3/nnet-parse.h"
 #include "nnet3/nnet-computation-graph.h"
+#include "nnet3/mish-component.h"
 
 
 
@@ -109,6 +110,8 @@ Component* Component::NewComponentOfType(const std::string &component_type) {
     ans = new RectifiedLinearComponent();
   } else if (component_type == "SoftplusComponent") {
     ans = new SoftplusComponent();
+  } else if (component_type == "MishComponent") {
+    ans = new MishComponent();
   } else if (component_type == "NormalizeComponent") {
     ans = new NormalizeComponent();
   } else if (component_type == "PnormComponent") {
