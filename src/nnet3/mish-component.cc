@@ -18,6 +18,7 @@
 // limitations under the License.
 
 #include "nnet3/mish-component.h"
+
 #include "cudamatrix/cu-math.h"
 
 namespace kaldi {
@@ -35,13 +36,11 @@ void *MishComponent::Propagate(const ComponentPrecomputedIndexes *indexes,
 
 void DiffMish(const CuMatrixBase<BaseFloat> &in_value,
               CuMatrixBase<BaseFloat> *in_deriv) {
-  CuMatrix<BaseFloat> tmp(3 * in_value.NumRows(), in_value.NumCols(),
-                          kUndefined);
-  CuSubMatrix<BaseFloat> x_sigmoid = tmp.RowRange(0, in_value.NumRows());
-  CuSubMatrix<BaseFloat> x_sp =
-      tmp.RowRange(in_value.NumRows(), in_value.NumRows());
-  CuSubMatrix<BaseFloat> x_tanh_sp =
-      tmp.RowRange(2 * in_value.NumRows(), in_value.NumRows());
+  CuMatrix<BaseFloat> x_sigmoid(in_value.NumRows(), in_value.NumCols(),
+                                kUndefined);
+  CuMatrix<BaseFloat> x_sp(in_value.NumRows(), in_value.NumCols(), kUndefined);
+  CuMatrix<BaseFloat> x_tanh_sp(in_value.NumRows(), in_value.NumCols(),
+                                kUndefined);
   x_sigmoid.Sigmoid(in_value);
   x_sp.SoftHinge(in_value);
   x_tanh_sp.Tanh(x_sp);
@@ -53,7 +52,7 @@ void DiffMish(const CuMatrixBase<BaseFloat> &in_value,
 void MishComponent::Backprop(const std::string &debug_info,
                              const ComponentPrecomputedIndexes *indexes,
                              const CuMatrixBase<BaseFloat> &in_value,
-                             const CuMatrixBase<BaseFloat> &,  // out_value
+                             const CuMatrixBase<BaseFloat> &out_value,
                              const CuMatrixBase<BaseFloat> &out_deriv,
                              void *memo, Component *to_update_in,
                              CuMatrixBase<BaseFloat> *in_deriv) const {
