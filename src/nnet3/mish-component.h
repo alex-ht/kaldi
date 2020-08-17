@@ -36,7 +36,7 @@ class MishComponent: public NonlinearComponent {
   virtual std::string Type() const { return "MishComponent"; }
   virtual Component* Copy() const { return new MishComponent(*this); }
   virtual int32 Properties() const {
-    return kSimpleComponent|kBackpropNeedsInput|kBackpropNeedsOutput|kPropagateInPlace|
+    return kSimpleComponent|kBackpropNeedsInput|
         kStoresStats|(block_dim_ != dim_ ? kInputContiguous : 0);
   }
   virtual void* Propagate(const ComponentPrecomputedIndexes *indexes,
@@ -45,7 +45,7 @@ class MishComponent: public NonlinearComponent {
   virtual void Backprop(const std::string &debug_info,
                         const ComponentPrecomputedIndexes *indexes,
                         const CuMatrixBase<BaseFloat> &in_value,
-                        const CuMatrixBase<BaseFloat> &out_value,
+                        const CuMatrixBase<BaseFloat> &, // out_value
                         const CuMatrixBase<BaseFloat> &out_deriv,
                         void *memo,
                         Component *to_update,

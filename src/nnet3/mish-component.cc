@@ -19,6 +19,7 @@
 
 #include "nnet3/mish-component.h"
 
+#include "base/kaldi-math.h"
 #include "cudamatrix/cu-math.h"
 
 namespace kaldi {
@@ -27,20 +28,20 @@ namespace nnet3 {
 void *MishComponent::Propagate(const ComponentPrecomputedIndexes *indexes,
                                const CuMatrixBase<BaseFloat> &in,
                                CuMatrixBase<BaseFloat> *out) const {
-  CuMatrix<BaseFloat> tmp(in.NumRows(), in.NumCols(), kUndefined);
+  CuMatrix<BaseFloat> tmp(in.NumRows(), in.NumCols());
   tmp.SoftHinge(in);
   out->Tanh(tmp);
   out->MulElements(in);
   return NULL;
 }
 
-void DiffMish(const CuMatrixBase<BaseFloat> &in_value,
+inline void DiffMish(const CuMatrixBase<BaseFloat> &in_value,
               CuMatrixBase<BaseFloat> *in_deriv) {
-  CuMatrix<BaseFloat> x_sigmoid(in_value.NumRows(), in_value.NumCols(),
-                                kUndefined);
-  CuMatrix<BaseFloat> x_sp(in_value.NumRows(), in_value.NumCols(), kUndefined);
-  CuMatrix<BaseFloat> x_tanh_sp(in_value.NumRows(), in_value.NumCols(),
-                                kUndefined);
+  CuMatrix<BaseFloat> tmp(3*in_value.NumRows(), in_value.NumCols(),kUndefined);
+  CuSubMatrix<BaseFloat> x_sigmoid = tmp.RowRange(0, in_value.NumRows());
+  CuSubMatrix<BaseFloat> x_sp = tmp.RowRange(in_value.NumRows(), in_value.NumRows());
+  CuSubMatrix<BaseFloat> x_tanh_sp = tmp.RowRange(2*in_value.NumRows(), in_value.NumRows());
+
   x_sigmoid.Sigmoid(in_value);
   x_sp.SoftHinge(in_value);
   x_tanh_sp.Tanh(x_sp);
@@ -52,7 +53,7 @@ void DiffMish(const CuMatrixBase<BaseFloat> &in_value,
 void MishComponent::Backprop(const std::string &debug_info,
                              const ComponentPrecomputedIndexes *indexes,
                              const CuMatrixBase<BaseFloat> &in_value,
-                             const CuMatrixBase<BaseFloat> &out_value,
+                             const CuMatrixBase<BaseFloat> &, // out_value
                              const CuMatrixBase<BaseFloat> &out_deriv,
                              void *memo, Component *to_update_in,
                              CuMatrixBase<BaseFloat> *in_deriv) const {
@@ -69,10 +70,6 @@ void MishComponent::Backprop(const std::string &debug_info,
   }
 }
 
-/*
-  Note on the derivative of the softplus function:
-  softplus'(x) = sigmoid(x)
-*/
 void MishComponent::StoreStats(const CuMatrixBase<BaseFloat> &in_value,
                                const CuMatrixBase<BaseFloat> &out_value,
                                void *memo) {
@@ -80,7 +77,7 @@ void MishComponent::StoreStats(const CuMatrixBase<BaseFloat> &in_value,
   // always store it, which is necessary for the ConsolidateMemory() operation
   // to work correctly.
   if (RandInt(0, 1) == 0 && count_ != 0) return;
-  // derivative of the onlinearity is out_value * (1.0 - out_value);
+  // derivative
   CuMatrix<BaseFloat> temp_deriv(in_value.NumRows(), in_value.NumCols(),
                                  kUndefined);
   DiffMish(in_value, &temp_deriv);
