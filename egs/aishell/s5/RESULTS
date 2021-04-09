@@ -16,3 +16,7 @@
 %WER 7.45 [ 7807 / 104765, 340 ins, 497 del, 6970 sub ] exp/chain/tdnn_2a_sp/decode_test/cer_11_0.5
 %WER 7.43 [ 7780 / 104765, 341 ins, 469 del, 6970 sub ] exp/chain/tdnn_2a_sp_online/decode_test/cer_11_0.5
 %WER 7.92 [ 8296 / 104765, 384 ins, 472 del, 7440 sub ] exp/chain/tdnn_2a_sp_online/decode_test_per_utt/cer_11_0.5
+
+# local/chain/tuning/run_cnn_lstm_1a.sh
+%WER 5.00 [ 10276 / 205341, 286 ins, 282 del, 9708 sub ] exp/chain/tdnn_1a_sp/decode_dev/cer_7_0.5
+%WER 5.75 [ 6026 / 104765, 140 ins, 298 del, 5588 sub ] exp/chain/tdnn_1a_sp/decode_test/cer_8_1.0
