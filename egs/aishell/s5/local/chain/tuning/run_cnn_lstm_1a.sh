@@ -3,9 +3,10 @@
 # left-context: 33
 # right-context: 15
 # num-parameters: 47067170 ...
-#
+# 
 # %WER 5.00 [ 10276 / 205341, 286 ins, 282 del, 9708 sub ] exp/chain/tdnn_1a_sp/decode_dev/cer_7_0.5
 # %WER 5.75 [ 6026 / 104765, 140 ins, 298 del, 5588 sub ] exp/chain/tdnn_1a_sp/decode_test/cer_8_1.0
+# Update: cnn接錯，可能會有些許差距
 set -e
 
 # configs for 'chain'
@@ -129,7 +130,7 @@ if [ $stage -le 10 ]; then
   conv-relu-batchnorm-layer name=cnn1e $cnn_opts height-in=80 height-out=80 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=64 $lowlrate_opts
   combine-feature-maps-layer name=cnn1f input=Append(combine_inputs, cnn1e) num-filters1=4 num-filters2=64 height=80
   conv-relu-batchnorm-layer name=csp1a $cnn_opts height-in=80 height-out=40 height-subsample-out=2 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=64 $lowlrate_opts
-  conv-relu-batchnorm-layer name=csp1b $cnn_opts height-in=80 height-out=40 height-subsample-out=2 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=64 $lowlrate_opts
+  conv-relu-batchnorm-layer name=csp1b input=cnn1f $cnn_opts height-in=80 height-out=40 height-subsample-out=2 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=64 $lowlrate_opts
   # CSPDense block 2
   conv-relu-batchnorm-layer name=cnn2a input=csp1b $cnn_opts height-in=40 height-out=40 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=64
   combine-feature-maps-layer name=cnn2b input=Append(csp1b, cnn2a) num-filters1=64 num-filters2=64 height=40
@@ -138,7 +139,7 @@ if [ $stage -le 10 ]; then
   conv-relu-batchnorm-layer name=cnn2e $cnn_opts height-in=40 height-out=40 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=128
   combine-feature-maps-layer name=cnn2f input=Append(csp1a, cnn2e) num-filters1=64 num-filters2=128 height=40
   conv-relu-batchnorm-layer name=csp2a $cnn_opts height-in=40 height-out=20 height-subsample-out=2 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=128
-  conv-relu-batchnorm-layer name=csp2b $cnn_opts height-in=40 height-out=20 height-subsample-out=2 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=128
+  conv-relu-batchnorm-layer name=csp2b input=cnn2f $cnn_opts height-in=40 height-out=20 height-subsample-out=2 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=128
   # CSPDense block3
   conv-relu-batchnorm-layer name=cnn3a input=csp2b $cnn_opts height-in=20 height-out=20 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=128
   combine-feature-maps-layer name=cnn3b input=Append(csp2b, cnn3a) num-filters1=128 num-filters2=128 height=20
@@ -147,7 +148,7 @@ if [ $stage -le 10 ]; then
   conv-relu-batchnorm-layer name=cnn3e $cnn_opts height-in=20 height-out=20 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=256
   combine-feature-maps-layer name=cnn3f input=Append(csp2a, cnn3e) num-filters1=128 num-filters2=256 height=20
   conv-relu-batchnorm-layer name=csp3a $cnn_opts height-in=20 height-out=10 height-subsample-out=2 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=256
-  conv-relu-batchnorm-layer name=csp3b $cnn_opts height-in=20 height-out=10 height-subsample-out=2 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=256
+  conv-relu-batchnorm-layer name=csp3b input=cnn3f $cnn_opts height-in=20 height-out=10 height-subsample-out=2 time-offsets=-1,0,1 height-offsets=-1,0,1 num-filters-out=256
   # CSPLSTMP 1
   linear-component name=lstm1a dim=320 $linear_opts input=Append(-3,0)
   fast-lstmp-layer name=lstm1b cell-dim=1536 recurrent-projection-dim=384 non-recurrent-projection-dim=384 delay=-3 dropout-proportion=0.0 $lstm_opts
