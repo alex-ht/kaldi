@@ -26,7 +26,7 @@
 #include <algorithm>
 #include <iomanip>
 #include "nnet3/nnet-simple-component.h"
-#include "nnet3/nnet-parse.h"
+//#include "nnet3/nnet-parse.h"
 #include "cudamatrix/cu-math.h"
 
 namespace kaldi {

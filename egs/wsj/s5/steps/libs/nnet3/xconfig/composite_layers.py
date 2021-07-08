@@ -250,6 +250,7 @@ class XconfigPrefinalLayer(XconfigLayerBase):
                        'small-dim':-1,
                        'l2-regularize':0.0,
                        'max-change': 0.75,
+                       'nonlinear': 'relu',
                        'self-repair-scale': 1.0e-05}
 
     def set_derived_configs(self):
@@ -260,6 +261,8 @@ class XconfigPrefinalLayer(XconfigLayerBase):
             raise RuntimeError("small-dim must be set and >0.")
         if self.config['big-dim'] <= self.config['small-dim']:
             raise RuntimeError("big-dim must be greater than small-dim")
+        if self.config['nonlinear'] not in [ 'relu', 'mish' ]:
+            raise RuntimeError("Expected [relu|mish], got %s ." % (self.config['nonlinear']))
 
     def output_name(self, auxiliary_output=None):
         assert auxiliary_output is None
@@ -298,17 +301,24 @@ class XconfigPrefinalLayer(XconfigLayerBase):
                        'input={1}'.format(name, input_descriptor))
 
         # The ReLU layer
-        configs.append('component name={0}.relu type=RectifiedLinearComponent dim={1} '
-                       'self-repair-scale={2}'.format(
-                           name, big_dim, self_repair_scale))
-        configs.append('component-node name={0}.relu component={0}.relu '
-                       'input={0}.affine'.format(name))
+        if self.config['nonlinear'] == 'relu':
+            configs.append('component name={0}.nonlinear type=RectifiedLinearComponent dim={1} '
+                           'self-repair-scale={2}'.format(
+                               name, big_dim, self_repair_scale))
+            configs.append('component-node name={0}.nonlinear component={0}.nonlinear '
+                           'input={0}.affine'.format(name))
+        elif self.config['nonlinear'] == 'mish':
+            configs.append('component name={0}.nonlinear type=MishComponent dim={1} '
+                           'self-repair-scale={2}'.format(
+                               name, big_dim, self_repair_scale))
+            configs.append('component-node name={0}.nonlinear component={0}.nonlinear '
+                           'input={0}.affine'.format(name))
 
         # The first BatchNorm layer
         configs.append('component name={0}.batchnorm1 type=BatchNormComponent '
                        'dim={1}'.format(name, big_dim))
         configs.append('component-node name={0}.batchnorm1 component={0}.batchnorm1 '
-                       'input={0}.relu'.format(name))
+                       'input={0}.nonlinear'.format(name))
 
         # The linear layer, from big-dim to small-dim, with orthonormal-constraint=-1
         # ("floating" orthonormal constraint).
